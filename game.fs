@@ -5,16 +5,25 @@
 : print-empty ( -- )
   32 emit 32 emit ;
 
+: print-light-shade ( -- )
+  226 emit 150 emit 145 emit
+  226 emit 150 emit 145 emit ;
+
 : print-board { board n -- }
   \ print a square board of size n where every non-zero value is highlighed
   n 0 u+do
     10 emit \ line break
     i n 0 u+do
       board over n * cells + i cells + @
-      0= if
+      dup 0= if
+        drop
         print-full
       else
-        print-empty
+        -2 = if
+          print-light-shade
+        else
+          print-empty
+        then
       then
     loop
     drop \ drop the outer index
@@ -47,7 +56,7 @@
   THEN ;
 
 : next-location { a1 a2 d n -- a1 a2 }
-  \ Calcualte the next location for 'a2' based on the given direction 'd' and grid size 'n' at 'a1'
+  \ Calcualte the next location for 'a2' based on the given direction 'd' and grid at 'a1' with size 'n'
 
   a2 a1 - cell /  \ calc the grid offset
   n /mod          \ split into x and y coordinates
@@ -123,6 +132,27 @@
   ( )
 ;
 
+: spawn-fruit { board n -- }
+  \ Spawn a fruit at some empty location
+  
+  begin
+
+    \ Pick a random number in [0; n*n]
+    utime drop n dup * mod
+    { r }
+    
+    \ Calculate the address
+    board r cells +
+
+    \ Only set if the position is empty
+    dup @ 0= IF 
+      -2 swap !
+      exit
+    THEN
+
+  again
+;
+
 : game-loop { board head n -- }
   \ Run the game loop
 
@@ -162,21 +192,26 @@
     head -rot
     ( head a1 a0 )
 
-    \ check for self collision
-    dup @ 0<> IF
+    \ check for self collision (i.e. not empty and not a fruit)
+    dup @ dup 0<> swap -2 <> and 
+    IF
       10 emit
       ." Game Over"
       EXIT
     THEN
     
-    \ decide if the snake should grow (it grows every 5 iterations)
-    ( [i d] head a1 a0 )
-    >r fourth r> swap     \ copy the loop counter to the top, it's at the 5'th position
-    5 mod 0=
+    \ the snake should grow if the next location contains a fruit
+    dup @ -2 =
+    { grow }
     
     \ move the snake to the new location
-    ( head a1 a0 b )
-    move-snake
+    ( head a1 a0 )
+    grow move-snake
+
+    \ span the next fruit
+    grow IF 
+      board n spawn-fruit
+    THEN
     
     \ Render the game state
     
@@ -207,6 +242,9 @@
   \ initialize the snake (the value -1 signals the tail of the snake)
   dup -1 swap !     \ first cell is the tail
   dup dup cell + !  \ second cell is the head and points at tail
+
+  \ initialize the fruit
+  dup n spawn-fruit
 
   \ store address of the head
   here cell allot
