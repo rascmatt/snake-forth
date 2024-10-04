@@ -149,12 +149,16 @@
       -2 swap !
       exit
     THEN
+    drop
 
   again
 ;
 
-: game-loop { board head n -- }
+: game-loop { board head n -- s }
   \ Run the game loop
+
+  \ Initialize the score
+  0
 
   \ Initialize the loop counter
   1
@@ -164,13 +168,14 @@
 
   BEGIN
 
-    ( i d )
+    ( s i d )
     
     \ Check for user input
     KEY? IF
       KEY
       DUP 'q' = IF
-        DROP EXIT  \ Exit the loop if 'q' is pressed
+        ( s i d c )
+        DROP DROP DROP EXIT  \ Exit the loop if 'q' is pressed
       ELSE
         ( d c )
         get-direction
@@ -197,7 +202,8 @@
     IF
       10 emit
       ." Game Over"
-      EXIT
+      ( s i d head a1 a0 )
+      DROP DROP DROP DROP DROP EXIT
     THEN
     
     \ the snake should grow if the next location contains a fruit
@@ -212,17 +218,23 @@
     grow IF 
       board n spawn-fruit
     THEN
+
+    grow IF
+      ( s i d )
+      rot 1+ -rot
+    THEN
     
     \ Render the game state
     
     clear-screen
+    10 emit ." Score: " third .
     board n print-board
 
     \ Increase the loop counter
     swap 1+ swap
 
     \ Limit fps
-    400 ms
+    250 ms
   AGAIN
 ;
 
@@ -251,4 +263,6 @@
   
   dup third cell + swap !
   
-  n game-loop ;
+  n game-loop 
+  10 emit ." Final Score: " . 10 emit
+;
