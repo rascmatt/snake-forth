@@ -49,7 +49,29 @@
         c 's' = IF 
           d1 3 <> IF 4 ELSE d1 THEN
         ELSE
-          d1
+          \ Check for arrow key sequences
+          c 27 = IF                \ ESC key (beginning of arrow key sequence)
+            KEY 91 = IF            \ '[' key (second part of arrow key sequence)
+              KEY CASE
+                68 OF  \ Left arrow
+                  d1 2 <> IF 1 ELSE d1 THEN
+                ENDOF
+                67 OF  \ Right arrow
+                  d1 1 <> IF 2 ELSE d1 THEN
+                ENDOF
+                65 OF  \ Up arrow
+                  d1 4 <> IF 3 ELSE d1 THEN
+                ENDOF
+                66 OF  \ Down arrow
+                  d1 3 <> IF 4 ELSE d1 THEN
+                ENDOF
+              ENDCASE
+            ELSE
+              d1  \ Default to the previous direction if it's not an arrow sequence
+            THEN
+          ELSE
+            d1  \ Default to the previous direction if no valid key is pressed
+          THEN
         THEN
       THEN    
     THEN
