@@ -5,82 +5,115 @@
 : print-empty ( -- )
   32 emit 32 emit ;
 
-: print-board { n1 n2 n -- }
-  \ print a square board of size n with the cell at index (n1, n2) highlighted
+: print-board { board n -- }
+  \ print a square board of size n where every non-zero value is highlighed
   n 0 u+do
     10 emit \ line break
     i n 0 u+do
-      i n1 = if 
-        dup n2 = if
-            print-empty
-        else 
-            print-full
-        then
-      else
+      board over n * cells + i cells + @
+      0= if
         print-full
+      else
+        print-empty
       then
     loop
     drop \ drop the outer index
   loop ;
-
-: get-char ( -- )
-  ." Press a key: "  \ Prompt the user
-  KEY                \ Read a key
-;
 
 : clear-screen ( -- )
   27 EMIT  \ Emit the ESC character (ASCII code 27)
   ." [2J"  \ Send the "[2J" sequence to clear the screen
 ;
 
-: sleep ( n -- )  \ n is the number of milliseconds to sleep
-  ms
-;
-
-: inc ( addr n -- )
-  \ increase the value at specified address with max value n
-  over @ <= if
-    drop exit \ do nothing
-  then
-  dup @ 1+ over ! drop ;
-
-: dec ( addr n -- )
-  \ decrease the value at specified address with min value n
-  over @ >= if
-    drop exit \ do nothing
-  then
-  dup @ 1- over ! drop ;
-
-: handle-direction-keys { a1 a2 n c -- }
-  \ change the increase the values att a1 and a2 if c is a direction key (W,A,S,D). n is the board size
+: get-direction { d1 c -- d2 }
+  \ resolve direction d2 from key press (0, 1, 2, 3, 4), otherwise default to the previous direction d1
   c 'a' = IF
-      a1 0 dec
+    1
   ELSE 
-      c 'd' = IF
-          a1 n 1- inc
+    c 'd' = IF
+      2
+    ELSE
+      c 'w' = IF 
+        3
       ELSE
-          c 'w' = IF 
-              a2 0 dec
-          ELSE
-              c 's' = IF 
-                  a2 n 1- inc
-              THEN        
-          THEN    
-      THEN
+        c 's' = IF 
+          4
+        ELSE
+          d1
+        THEN
+      THEN    
+    THEN
   THEN ;
 
-\ Create global variables
-create x 0 ,  \ x position of current index
-create y 0 ,  \ y position of current index
+: next-location { a d n -- a1 a2 }
+  \ Calcualte the next location for 'a' based on the given direction 'd' and grid size 'n'
+  
+  a
 
-: game-loop { n -- }
-  \ Start the game loop
+  d 1 = IF
+    dup cell -     \ Move left
+    exit
+  THEN
+  
+  d 2 = IF
+    dup cell +     \ Move right
+    exit
+  THEN
 
-  \ Reset index
-  0 x !
-  0 y !
+  d 3 = IF
+    dup n cells -  \ Move down
+    exit
+  THEN
+  
+  dup n cells +    \ Move up
+;
+
+: move-snake { head a1 a2 b -- }
+  \ Move the snake with head at a1 to the new location a2.
+  \ Decide wheter to grow the snake (i.e. the tail will not be moved) based on the flag 'b'
+
+  \ Do nothing if the new location is the same as the old one
+  a1 a2 = IF
+    EXIT
+  THEN
+
+  \ update the head pointer to point to the new address
+  a2 head !
+  \ update the new head to point to the old head
+  a1 a2 !
+
+  b 0<> IF
+    EXIT
+  THEN
+  
+  ( )
+  a1
+  ( a1 )
+  dup @ ( a1 a2 )
+  begin
+    dup @ -1 <> while
+    nip ( a2 )
+    dup @ ( a2 a3 )
+  repeat
+
+  ( a1 a2 )
+  0 swap ! ( a1 )
+  true swap !
+  ( )
+;
+
+: game-loop { board head n -- }
+  \ Run the game loop
+
+  \ Initialize the loop counter
+  1
+
+  \ Initialize the direction to move right
+  2
 
   BEGIN
+
+    ( i d )
     
     \ Check for user input
     KEY? IF
@@ -88,16 +121,70 @@ create y 0 ,  \ y position of current index
       DUP 'q' = IF
         DROP EXIT  \ Exit the loop if 'q' is pressed
       ELSE
-        >r x y n r>
-        handle-direction-keys
+        ( d c )
+        get-direction
+        ( d )
       THEN
     THEN
+
+    \ Update the game state
+
+    dup 0 <> IF
+      
+      \ calculate next locaion based on current position & user input
+      ( )
+      dup head @ swap n
+      ( a1 dir n )
+      next-location
+      ( a1 a0 )
+
+      head -rot
+      ( head a1 a0 )
+      
+      \ decide if the snake should grow (it grows every 5 iterations)
+      ( [i d] head a1 a0 )
+      >r fourth r> swap     \ copy the loop counter to the top, it's at the 5'th position
+      5 mod 0=
+      
+      \ move the snake to the new location
+      ( head a1 a0 b )
+      move-snake
+      
+    THEN
     
-    \ Game Loop
+    \ Render the game state
     
     clear-screen
-    x @ y @ n print-board
+    board n print-board
 
-    80 ms  \ Sleep for 80 milliseconds between frames
+    \ Increase the loop counter
+    swap 1+ swap
+
+    \ Limit fps
+    200 ms
   AGAIN
 ;
+
+: start { n -- }
+  \ Start a game with a board size of n
+  
+  \ allocate memory for the board
+  here n dup * cells allot
+
+  \ clear board
+  n 0 u+do
+    i n 0 u+do
+      over over n * cells + i cells + 0 swap !
+    loop drop
+  loop
+
+  \ initialize the snake (the value -1 signals the tail of the snake)
+  dup -1 swap !     \ first cell is the tail
+  dup dup cell + !  \ second cell is the head and points at tail
+
+  \ store address of the head
+  here cell allot
+  
+  dup third cell + swap !
+  
+  n game-loop ;
