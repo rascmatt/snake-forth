@@ -5,28 +5,6 @@
 : print-empty ( -- )
   32 emit 32 emit ;
 
-: print-checkered-board { n -- }
-  \ print a checkered square board of size n
-  n 0 u+do
-    10 emit \ line break
-    i n 0 u+do
-      i 2 mod 0= if 
-        dup 2 mod 0= if
-            print-full
-        else 
-            print-empty
-        then
-      else
-        dup 2 mod 0= if
-            print-empty
-        else 
-            print-full
-        then
-      then
-    loop
-    drop \ drop the outer index
-  loop ;
-
 : print-board { n1 n2 n -- }
   \ print a square board of size n with the cell at index (n1, n2) highlighted
   n 0 u+do
@@ -73,13 +51,30 @@
   then
   dup @ 1- over ! drop ;
 
+: handle-direction-keys { a1 a2 n c -- }
+  \ change the increase the values att a1 and a2 if c is a direction key (W,A,S,D). n is the board size
+  c 'a' = IF
+      a1 0 dec
+  ELSE 
+      c 'd' = IF
+          a1 n 1- inc
+      ELSE
+          c 'w' = IF 
+              a2 0 dec
+          ELSE
+              c 's' = IF 
+                  a2 n 1- inc
+              THEN        
+          THEN    
+      THEN
+  THEN ;
 
-\ Create global index for current position
-create x 0 ,
-create y 0 ,
+\ Create global variables
+create x 0 ,  \ x position of current index
+create y 0 ,  \ y position of current index
 
 : game-loop { n -- }
-  \ Start the game loop with a board size of n
+  \ Start the game loop
 
   \ Reset index
   0 x !
@@ -88,29 +83,14 @@ create y 0 ,
   BEGIN
     
     \ Check for user input
-    \ TODO: extract to separate word
     KEY? IF
       KEY
       DUP 'q' = IF
         DROP EXIT  \ Exit the loop if 'q' is pressed
       ELSE
-        DUP 'a' = IF
-            x 0 dec
-        ELSE 
-            DUP 'd' = IF 
-                x n 1- inc
-            ELSE
-                DUP 'w' = IF 
-                    y 0 dec
-                ELSE
-                    DUP 's' = IF 
-                        y n 1- inc
-                    THEN        
-                THEN    
-            THEN
-        THEN
+        >r x y n r>
+        handle-direction-keys
       THEN
-      DROP
     THEN
     
     \ Game Loop
@@ -118,6 +98,6 @@ create y 0 ,
     clear-screen
     x @ y @ n print-board
 
-    100 ms  \ Sleep for 100 milliseconds between frames
+    80 ms  \ Sleep for 80 milliseconds between frames
   AGAIN
 ;
