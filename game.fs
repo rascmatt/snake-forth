@@ -27,17 +27,18 @@
 
 : get-direction { d1 c -- d2 }
   \ resolve direction d2 from key press (0, 1, 2, 3, 4), otherwise default to the previous direction d1
+  \ if the direction is the opposite as the current direction, ignore it
   c 'a' = IF
-    1
+    d1 2 <> IF 1 ELSE d1 THEN
   ELSE 
     c 'd' = IF
-      2
+      d1 1 <> IF 2 ELSE d1 THEN
     ELSE
       c 'w' = IF 
-        3
+        d1 4 <> IF 3 ELSE d1 THEN
       ELSE
         c 's' = IF 
-          4
+          d1 3 <> IF 4 ELSE d1 THEN
         ELSE
           d1
         THEN
@@ -45,27 +46,47 @@
     THEN
   THEN ;
 
-: next-location { a d n -- a1 a2 }
-  \ Calcualte the next location for 'a' based on the given direction 'd' and grid size 'n'
-  
-  a
+: next-location { a1 a2 d n -- a1 a2 }
+  \ Calcualte the next location for 'a2' based on the given direction 'd' and grid size 'n' at 'a1'
 
-  d 1 = IF
-    dup cell -     \ Move left
-    exit
-  THEN
+  a2 a1 - cell /  \ calc the grid offset
+  n /mod          \ split into x and y coordinates
+  { x y }
   
-  d 2 = IF
-    dup cell +     \ Move right
+  a2
+
+  d 1 = IF              \ Move left
+    x 0= IF
+      dup n 1- cells +  \ Wrap around
+    ELSE 
+      dup cell -        \ Move left
+    THEN
     exit
   THEN
 
-  d 3 = IF
-    dup n cells -  \ Move down
+  d 2 = IF              \ Move right
+    x n 1- = IF
+      dup n 1- cells -  \ Wrap around
+    ELSE 
+      dup cell +        \ Move right
+    THEN
+    exit
+  THEN
+
+  d 3 = IF                  \ Move up
+    y 0= IF
+      dup n n 1- * cells +  \ Wrap around
+    ELSE 
+      dup n cells -         \ Move up
+    THEN
     exit
   THEN
   
-  dup n cells +    \ Move up
+  y n 1- = IF
+    dup n n 1- * cells -  \ Wrap around
+  ELSE
+    dup n cells +         \ Move down
+  THEN
 ;
 
 : move-snake { head a1 a2 b -- }
@@ -129,28 +150,33 @@
 
     \ Update the game state
 
-    dup 0 <> IF
-      
-      \ calculate next locaion based on current position & user input
-      ( )
-      dup head @ swap n
-      ( a1 dir n )
-      next-location
-      ( a1 a0 )
+    \ calculate next locaion based on current position & user input
+    ( )
+    dup board swap
+    ( board dir )
+    head @ swap n
+    ( board a1 dir n )
+    next-location
+    ( a1 a0 )
 
-      head -rot
-      ( head a1 a0 )
-      
-      \ decide if the snake should grow (it grows every 5 iterations)
-      ( [i d] head a1 a0 )
-      >r fourth r> swap     \ copy the loop counter to the top, it's at the 5'th position
-      5 mod 0=
-      
-      \ move the snake to the new location
-      ( head a1 a0 b )
-      move-snake
-      
+    head -rot
+    ( head a1 a0 )
+
+    \ check for self collision
+    dup @ 0<> IF
+      10 emit
+      ." Game Over"
+      EXIT
     THEN
+    
+    \ decide if the snake should grow (it grows every 5 iterations)
+    ( [i d] head a1 a0 )
+    >r fourth r> swap     \ copy the loop counter to the top, it's at the 5'th position
+    5 mod 0=
+    
+    \ move the snake to the new location
+    ( head a1 a0 b )
+    move-snake
     
     \ Render the game state
     
@@ -161,7 +187,7 @@
     swap 1+ swap
 
     \ Limit fps
-    200 ms
+    400 ms
   AGAIN
 ;
 
